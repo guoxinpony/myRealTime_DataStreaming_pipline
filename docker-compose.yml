@@ -1,4 +1,24 @@
-version: '3'
+# version: '3'
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.10.5-python3.10
+  environment:
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__EXECUTOR: "SequentialExecutor"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:airflow@postgres:5432/airflow"
+    AIRFLOW_WEBSERVER_SECRET_KEY: "this_is_a_very_secured_key"
+    PIP_ADDITIONAL_REQUIREMENTS: "kafka-python==2.0.2 requests>=2.31"
+  depends_on:
+    postgres:
+      condition: service_healthy
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+  user: "${AIRFLOW_UID:-50000}:0"
+  networks:
+    - confluent
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -65,6 +85,22 @@ services:
     restart: unless-stopped
 
 
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init-realtime-pipline
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow users create
+        --username admin
+        --password admin
+        --firstname Air
+        --lastname Flow
+        --role Admin
+        --email admin@example.com &&
+      echo 'Airflow init completed.'"
+
+
   schema-registry:
     image: confluentinc/cp-schema-registry:7.4.0
     hostname: schema-registry
@@ -124,58 +160,75 @@ services:
       timeout: 10s
       retries: 5
 
-
   webserver:
-    image: apache/airflow:2.10.5-python3.10
+    <<: *airflow-common
+    container_name: airflow-webserver-realtime-pipline
     command: webserver
-    entrypoint:
-    - /opt/airflow/script/entrypoint.sh
-    depends_on:
-    - postgres
-    environment:
-    - LOAD_EX=n
-    - EXECUTOR=Sequential
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-    - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-    logging:
-      options:
-        max-size: 10m
-        max-file: '3'
-    volumes:
-    - ./dags:/opt/airflow/dags
-    - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-    - ./requirements.txt:/opt/airflow/requirements.txt
     ports:
-    - 8080:8080
+      - "8080:8080"
     healthcheck:
-      test:
-      - CMD-SHELL
-      - '[ -f /opt/airflow/airflow-webserver.pid ]'
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 3
-    networks:
-    - confluent
 
+
+  # webserver:
+  #   image: apache/airflow:2.10.5-python3.10
+  #   command: webserver
+  #   entrypoint:
+  #   - /opt/airflow/script/entrypoint.sh
+  #   depends_on:
+  #   - postgres
+  #   environment:
+  #   - LOAD_EX=n
+  #   - EXECUTOR=Sequential
+  #   - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+  #   - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
+  #   logging:
+  #     options:
+  #       max-size: 10m
+  #       max-file: '3'
+  #   volumes:
+  #   - ./dags:/opt/airflow/dags
+  #   - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
+  #   - ./requirements.txt:/opt/airflow/requirements.txt
+  #   ports:
+  #   - 8080:8080
+  #   healthcheck:
+  #     test:
+  #     - CMD-SHELL
+  #     - '[ -f /opt/airflow/airflow-webserver.pid ]'
+  #     interval: 30s
+  #     timeout: 30s
+  #     retries: 3
+  #   networks:
+  #   - confluent
 
 
   scheduler:
-    image: apache/airflow:2.10.5-python3.10
-    depends_on:
-      webserver:
-        condition: service_healthy
-    volumes:
-    - ./dags:/opt/airflow/dags
-    - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-    - ./requirements.txt:/opt/airflow/requirements.txt
-    environment:
-    - LOAD_EX=n
-    - EXECUTOR=Sequential
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-    - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-    command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
-    networks:
-    - confluent
+    <<: *airflow-common
+    container_name: airflow-scheduler-realtime-pipline
+    command: scheduler
+
+
+  # scheduler:
+  #   image: apache/airflow:2.10.5-python3.10
+  #   depends_on:
+  #     webserver:
+  #       condition: service_healthy
+  #   volumes:
+  #   - ./dags:/opt/airflow/dags
+  #   - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
+  #   - ./requirements.txt:/opt/airflow/requirements.txt
+  #   environment:
+  #   - LOAD_EX=n
+  #   - EXECUTOR=Sequential
+  #   - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+  #   - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
+  #   command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
+  #   networks:
+  #   - confluent
 
 
 
@@ -189,6 +242,11 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
     - confluent
     restart: unless-stopped
@@ -239,11 +297,11 @@ networks:
   confluent: null
 
 
-x-airflow-common:
-  environment:
-    PIP_ADDITIONAL_REQUIREMENTS: kafka-python==2.0.2 requests>=2.31
-    AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+# x-airflow-common:
+#   environment:
+#     PIP_ADDITIONAL_REQUIREMENTS: kafka-python==2.0.2 requests>=2.31
+#     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+#     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
 
 volumes:
   postgres_data: null
