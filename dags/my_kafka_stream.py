@@ -9,6 +9,7 @@ default_args = {
     'start_date': datetime(2023, 9, 3, 10, 00)
 }
 
+# example api for getting data
 def get_data():
     import requests
 
@@ -42,15 +43,18 @@ def stream_data():
     from kafka import KafkaProducer
     import time
     import logging
+
     # run in docker network
-    # producer = KafkaProducer(bootstrap_servers=['broker:29092'], max_block_ms=5000)
+    producer = KafkaProducer(bootstrap_servers=['broker:29092'], max_block_ms=5000)
 
     # run file in host
-    producer = KafkaProducer(bootstrap_servers=['127.0.0.1:9092'], max_block_ms=5000)
-    curr_time = time.time()
+    # producer = KafkaProducer(bootstrap_servers=['127.0.0.1:9092'], max_block_ms=5000)
 
+    curr_time = time.time()
+    
+    # send data to kafka topic users_created(example), produce data for 10 sec
     while True:
-        if time.time() > curr_time + 60: #1 minute
+        if time.time() > curr_time + 10: #1 minute
             break
         try:
             res = get_data()
@@ -62,15 +66,15 @@ def stream_data():
             logging.error(f'An error occured: {e}')
             continue
 
-# with DAG('user_automation',
-#          default_args=default_args,
-#          schedule_interval='@daily',
-#          catchup=False) as dag:
+with DAG('user_automation',
+         default_args=default_args,
+         schedule_interval='@daily',
+         catchup=False) as dag:
 
-#     streaming_task = PythonOperator(
-#         task_id='stream_data_from_api',
-#         python_callable=stream_data
-#     )
+    streaming_task = PythonOperator(
+        task_id='stream_data_from_api',
+        python_callable=stream_data
+    )
 
 
-stream_data()
+# stream_data()
