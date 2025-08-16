@@ -19,6 +19,7 @@ def get_data():
 
     return res
 
+# form data from origion  JSON to python dict
 def format_data(res):
     data = {}
     location = res['location']
@@ -47,7 +48,8 @@ def stream_data():
     # run in docker network
     producer = KafkaProducer(bootstrap_servers=['broker:29092'], max_block_ms=5000)
 
-    # run file in host
+    # run file in host machine, set 9092 as the localhost port, do NOT use localhost:9092
+    # to prevent IPV6
     # producer = KafkaProducer(bootstrap_servers=['127.0.0.1:9092'], max_block_ms=5000)
 
     curr_time = time.time()
