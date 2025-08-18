@@ -312,6 +312,7 @@ services:
 # /opt/bitnami/spark/app/spark_stream.py
 
 
+# cassandra version: [cqlsh 6.2.0 | Cassandra 5.0.5 | CQL spec 3.4.7 | Native protocol v5]
   cassandra_db:
     image: cassandra:latest
     container_name: cassandra

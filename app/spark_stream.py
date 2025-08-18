@@ -9,8 +9,19 @@ from pyspark.sql.functions import col, length, udf, expr, when
 from pyspark.sql.types import BooleanType
 import re
 
+'''
+use spark, read data from kafka, as the consumer;
+spark streaming write to cassandra
+'''
+
 # create keyspace spark_streams_realtime_pipline in cassandra 
 def create_keyspace(session):
+    '''
+    cassandra create keyspace;
+    args:
+      session: cassandra connection, returned result of create_cassandra_connection func
+    return: None
+    '''
     session.execute("""
         CREATE KEYSPACE IF NOT EXISTS spark_streams_realtime_pipline
         WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
@@ -20,6 +31,12 @@ def create_keyspace(session):
 
 # create table in spark_streams_realtime_pipline
 def create_table(session):
+    '''
+    cassandra create table;
+    args:
+      session: cassandra connection, returned result of create_cassandra_connection func
+    return: None
+    '''
     session.execute("""
     CREATE TABLE IF NOT EXISTS spark_streams_realtime_pipline.created_users (
         id UUID PRIMARY KEY,
@@ -39,6 +56,12 @@ def create_table(session):
 
 
 def insert_data(session, **kwargs):
+    '''
+    cassandra insert data;
+    args:
+      session: cassandra connection, returned result of create_cassandra_connection func
+    return: None
+    '''
     print("inserting data...")
 
     user_id = kwargs.get('id')
@@ -68,6 +91,10 @@ def insert_data(session, **kwargs):
 
 
 def create_spark_connection():
+    '''
+    create spark connection for connecting to kafka, as the consumer;
+    return: spark connection
+    '''
     s_conn = None
 
     try:
@@ -101,6 +128,12 @@ def connect_to_kafka(spark_conn):
     #     logging.warning(f"kafka dataframe could not be created because: {e}")
 
     # return spark_df
+    '''
+    use spark connection read data from kafka;
+    args:
+      spark_conn: spark connection, returned result from create_spark_connection func
+    return: spark dataframe
+    '''
     return (spark_conn.readStream
             .format('kafka')
             .option('kafka.bootstrap.servers', 'broker:29092')
@@ -112,6 +145,10 @@ def connect_to_kafka(spark_conn):
 
 
 def create_cassandra_connection():
+    '''
+    create cassandra connection;
+    return: cassandra connection
+    '''
     try:
         # connecting to the cassandra cluster
         cluster = Cluster(['cassandra'])
@@ -145,7 +182,7 @@ def create_selection_df_from_kafka(spark_df):
 
     return sel
 
-
+# cleaning data: for  invalid or null id column, create a valid id for that record
 is_uuid = udf(lambda s: bool(re.fullmatch(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
     s or ""   
@@ -176,7 +213,7 @@ if __name__ == "__main__":
 
             logging.info("Streaming is being started...")
 
-            # streaming write into cassandra
+            # streaming write into cassandra and stay in running
 
             streaming_query = (clean_df.writeStream.format("org.apache.spark.sql.cassandra")
                                .option('checkpointLocation', '/tmp/checkpoint')
