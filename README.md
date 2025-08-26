@@ -58,7 +58,7 @@ docker pull <image name>
 - bitnami/spark:3.5.1
 - cassandra:5.0.5
 
-##### Run image:
+##### Run container topo:
 
 ```
 docker compose up -d
