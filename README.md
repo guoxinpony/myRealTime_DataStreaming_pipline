@@ -1,4 +1,4 @@
-# myRealTime_DataStreaming_pipline
+# Simplified Real Time Data Streaming Pipline
 use airflow, kafka, spark and cassandra to build a realtime data pipline for ingestion, process and strorage 
 
 ![archi](archi.png)
