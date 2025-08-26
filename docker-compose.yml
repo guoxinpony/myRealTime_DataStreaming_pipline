@@ -210,7 +210,8 @@ services:
 
     
   spark-master:
-    image: bitnami/spark:3.5.1
+    build: ./spark
+    image: my-spark:3.5.1
     command: bin/spark-class org.apache.spark.deploy.master.Master
     ports:
     - 9090:8080
@@ -220,7 +221,7 @@ services:
 
 
   spark-worker:
-    image: bitnami/spark:3.5.1
+    image: my-spark:3.5.1
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
     - spark-master
@@ -234,7 +235,7 @@ services:
 
 
   spark-submit:
-    image: bitnami/spark:3.5.1
+    image: my-spark:3.5.1
     depends_on:
       - spark-master
       - spark-worker
