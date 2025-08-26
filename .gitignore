@@ -20,3 +20,5 @@ bin-release/
 
 .env
 *.pyc
+
+pic
