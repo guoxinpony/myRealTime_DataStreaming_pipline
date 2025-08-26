@@ -87,8 +87,10 @@ services:
       - -lc
       - kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+
     restart: unless-stopped
 
 
@@ -114,7 +116,7 @@ services:
     container_name: schema-registry
     depends_on:
       broker:
-        condition: service_healthy
+        condition: service_started
     ports:
     - 8081:8081
     environment:
@@ -141,7 +143,7 @@ services:
     container_name: control-center
     depends_on:
       broker:
-        condition: service_healthy
+        condition: service_started
       schema-registry:
         condition: service_healthy
     ports:
